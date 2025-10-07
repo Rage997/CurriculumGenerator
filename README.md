@@ -1,0 +1,74 @@
+# Curriculum AI Generator
+
+A tool to generate customized CVs and cover letters using Ollama AI models based on job descriptions and user profiles.
+
+## Installation
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Install LaTeX (for PDF compilation):
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install texlive-latex-base texlive-fonts-recommended texlive-latex-extra
+
+   # Or install a full LaTeX distribution
+   ```
+
+   Also install luatex
+
+   ```
+   sudo apt-get install texlive-luatex texlive-latex-extra
+   ```
+
+3. Install and run Ollama:
+   ```bash
+   # Install Ollama from https://ollama.ai
+   ollama serve
+   ```
+
+4. Pull a model:
+   ```bash
+   ollama pull gemma3:latest
+   ```
+
+## Usage
+
+### Configure User Profile
+```bash
+python curriculum_generator.py configure \
+  --name "John Doe" \
+  --email "john.doe@example.com" \
+  --phone "+123456789" \
+  --address "123 Main St, City, Country" \
+  --skills "Python,JavaScript,SQL,Django" \
+  --experience "5+ years in web development" \
+  --education "Bachelor in Computer Science" \
+  --model gemma3:latest
+```
+
+### List available models
+```bash
+python curriculum_generator.py models
+```
+
+### Generate CV and cover letter
+```bash
+python curriculum_generator.py generate job_description.txt --output my_application
+```
+
+For testing without AI generation:
+```bash
+python curriculum_generator.py generate job_description.txt --output test --dry-run
+```
+
+This will create `my_application.tex` and `my_application.pdf` in the `output/cv/` and `output/cover_letter/` directories.
+
+## Directory Structure
+
+- `templates/cv/` - CV LaTeX templates
+- `templates/cover_letter/` - Cover letter LaTeX templates
+- `output/cv/` - Generated CV files
+- `output/cover_letter/` - Generated cover letter files

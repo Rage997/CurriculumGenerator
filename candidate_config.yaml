@@ -1,0 +1,44 @@
+model: gemma3:latest
+templates_dir: templates
+output_dir: output
+user:
+  name: John Doe
+  email: john.doe@example.com
+  phone: '+1 (555) 123-4567'
+  address: '123 Main Street, Anytown, USA'
+  skills:
+    - Python
+    - Django
+    - Flask
+    - JavaScript
+    - React
+    - PostgreSQL
+    - MongoDB
+    - Docker
+    - AWS
+    - Git
+  experience_summary: '7+ years in full-stack web development, specializing in Python and modern web technologies'
+  experiences:
+    - company: Tech Innovations Inc.
+      title: Senior Python Developer
+      dates: 'Jan 2020 - Present'
+      description: 'Led development of scalable web applications using Django and Flask. Designed and implemented RESTful APIs serving 100k+ users. Mentored junior developers and collaborated with cross-functional teams to deliver projects on time. Optimized database queries resulting in 40% performance improvement.'
+    - company: StartupXYZ
+      title: Full-Stack Developer
+      dates: 'Jun 2017 - Dec 2019'
+      description: 'Built responsive web applications with React frontend and Node.js backend. Integrated third-party APIs and implemented user authentication systems. Deployed applications to AWS using Docker containers and CI/CD pipelines.'
+    - company: WebDev Solutions
+      title: Junior Developer
+      dates: 'Aug 2015 - May 2017'
+      description: 'Developed and maintained client websites using HTML, CSS, JavaScript, and PHP. Worked with MySQL databases and implemented basic CRUD operations. Participated in code reviews and learned version control with Git.'
+  education: 'Bachelor of Science in Computer Science, University of Technology, 2015'
+  projects:
+    - name: E-commerce Platform
+      year: '2023'
+      description: 'Built a full-featured e-commerce platform with Django backend, React frontend, and Stripe payment integration. Features include user authentication, product catalog, shopping cart, and order management. Deployed on AWS with Docker.'
+    - name: Task Management App
+      year: '2022'
+      description: 'Developed a collaborative task management application using Flask and Socket.io for real-time updates. Implemented user roles, project boards, and drag-and-drop functionality. Used PostgreSQL for data storage.'
+    - name: Personal Finance Tracker
+      year: '2021'
+      description: 'Created a personal finance tracking web app with Python and Flask. Features include expense categorization, budget planning, and data visualization with Chart.js. Integrated with Plaid API for bank account syncing.'

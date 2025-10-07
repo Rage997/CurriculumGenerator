@@ -1,0 +1,4 @@
+ollama
+click
+pyyaml
+jinja2
