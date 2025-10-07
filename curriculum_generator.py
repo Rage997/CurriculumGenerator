@@ -6,36 +6,49 @@ Curriculum AI Generator using Ollama
 import click
 import yaml
 import os
+import json
+import logging
 from pathlib import Path
 import ollama
 from jinja2 import Environment, FileSystemLoader
 
+def escape_latex(text):
+    """Escape LaTeX special characters in text."""
+    return (text.replace('\\', '\\\\')
+                .replace('{', '\\{')
+                .replace('}', '\\}')
+                .replace('&', '\\&')
+                .replace('%', '\\%')
+                .replace('$', '\\$')
+                .replace('#', '\\#')
+                .replace('_', '\\_')
+                .replace('^', '\\^{}')
+                .replace('~', '\\~{}'))
+
+# Set up logging
+logging.basicConfig(
+    filename=Path(__file__).parent / 'curriculum_generator.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 # Load configuration
-CONFIG_FILE = Path.home() / '.curriculum_generator.yaml'
-DEFAULT_CONFIG = {
-    'model': 'qwen2.5:32b',
-    'templates_dir': 'templates',
-    'output_dir': 'output',
-    'user': {
-        'name': 'Your Name',
-        'email': 'your.email@example.com',
-        'phone': '+123456789',
-        'address': 'Your Address, City, Country',
-        'skills': ['Python', 'JavaScript', 'SQL'],
-        'experience': '5+ years in software development',
-        'education': 'Bachelor in Computer Science'
-    }
-}
+CONFIG_FILE = Path(__file__).parent / 'candidate_config.yaml'
+
 
 def load_config():
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, 'r') as f:
-            return yaml.safe_load(f)
-    return DEFAULT_CONFIG.copy()
+            config = yaml.safe_load(f)
+        logging.info(f"Loaded config from {CONFIG_FILE}")
+        return config
+    logging.info("Config file not found")
+    return {}
 
 def save_config(config):
     with open(CONFIG_FILE, 'w') as f:
         yaml.dump(config, f)
+    logging.info(f"Saved config to {CONFIG_FILE}")
 
 @click.group()
 def cli():
@@ -50,13 +63,13 @@ def cli():
 @click.option('--phone', help='Your phone number')
 @click.option('--address', help='Your address')
 @click.option('--skills', help='Your skills (comma-separated)')
-@click.option('--experience', help='Your experience summary')
+@click.option('--experience-summary', help='Your experience summary')
 @click.option('--education', help='Your education')
-def configure(model, templates_dir, output_dir, name, email, phone, address, skills, experience, education):
+def configure(model, templates_dir, output_dir, name, email, phone, address, skills, experience_summary, education):
     """Configure the curriculum generator"""
     config = load_config()
     if 'user' not in config:
-        config['user'] = DEFAULT_CONFIG['user'].copy()
+        config['user'] = {}
     if model:
         config['model'] = model
     if templates_dir:
@@ -73,8 +86,8 @@ def configure(model, templates_dir, output_dir, name, email, phone, address, ski
         config['user']['address'] = address
     if skills:
         config['user']['skills'] = [s.strip() for s in skills.split(',')]
-    if experience:
-        config['user']['experience'] = experience
+    if experience_summary:
+        config['user']['experience_summary'] = experience_summary
     if education:
         config['user']['education'] = education
     save_config(config)
@@ -101,6 +114,8 @@ def generate(job_description, output, dry_run):
     """Generate CV and cover letter from job description"""
     config = load_config()
     job_text = job_description.read()
+    logging.info(f"Generating documents for job: {job_description.name}")
+    logging.debug(f"Job text: {job_text[:500]}...")  # Log first 500 chars
 
     if dry_run:
         cv_content = "Education:\nSample education\n\nExperience:\nSample experience\n\nSkills:\nSample skills"
@@ -122,12 +137,15 @@ def generate(job_description, output, dry_run):
 
     # Parse job description for personalization
     job_data = parse_job_description(job_text)
+    logging.debug(f"Parsed job data: {job_data}")
 
     # Render LaTeX
     click.echo("Rendering LaTeX...")
+    logging.info("Rendering LaTeX templates")
     render_latex(cv_content, cover_content, job_data, output or 'generated', config)
 
     click.echo(f"Generated CV and cover letter in {config['output_dir']}/cv and {config['output_dir']}/cover_letter")
+    logging.info(f"Generation completed. Output in {config['output_dir']}")
 
 def check_ollama():
     """Check if Ollama is running and accessible"""
@@ -148,95 +166,144 @@ def list_models():
         click.echo(f"Error listing models: {e}")
         return []
 
+def format_education(text):
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    if len(lines) >= 3:
+        degree = escape_latex(lines[0])
+        university = escape_latex(lines[1])
+        year = escape_latex(lines[2])
+        return rf"\resumeSubHeadingListStart\resumeSubheading{{{degree}}}\resumeSubpoint{{{university}}}{{{year}}}\resumeSubHeadingListEnd"
+    return escape_latex(text)
+
+def format_experience(text):
+    jobs = text.split('\n\n')
+    result = ""
+    for job in jobs:
+        lines = [line.strip() for line in job.split('\n') if line.strip()]
+        if len(lines) >= 2:
+            title = escape_latex(lines[0])
+            company_dates = escape_latex(lines[1])
+            description = ' '.join(lines[2:])
+            items = [item.strip() for item in description.split('. ') if item.strip()]
+            item_str = ''.join(rf"\resumeItem{{{escape_latex(item)}}}" for item in items)
+            result += rf"\resumeSubheading{{{title}}}\resumeSubheading{{{company_dates}}}{item_str}"
+    return rf"\resumeSubHeadingListStart{result}\resumeSubHeadingListEnd"
+
+def format_projects(text):
+    projects = text.split('\n\n')
+    result = ""
+    for proj in projects:
+        lines = [line.strip() for line in proj.split('\n') if line.strip()]
+        if len(lines) >= 2:
+            name = escape_latex(lines[0])
+            year = escape_latex(lines[1])
+            description = ' '.join(lines[2:])
+            items = [item.strip() for item in description.split('. ') if item.strip()]
+            item_str = ''.join(rf"\resumeSubbullet{{{escape_latex(item)}}}" for item in items)
+            result += rf"\resumeSubheading{{{name} ({year})}}{item_str}"
+    return rf"\resumeSubHeadingListStart{result}\resumeSubHeadingListEnd"
+
+def format_skills(text):
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    skills = []
+    for line in lines:
+        if ':' in line:
+            _, s = line.split(':', 1)
+            skills.extend([sk.strip() for sk in s.split(',') if sk.strip()])
+    item_str = ''.join(rf"\item {escape_latex(skill)}" for skill in skills)
+    return rf"\begin{{multicols}}{{2}}\begin{{itemize}}[leftmargin=0em]{item_str}\end{{itemize}}\end{{multicols}}"
+
 def generate_cv(job_text, config):
     """Generate CV content using Ollama"""
+    logging.info("Starting CV generation")
     if not check_ollama():
+        logging.error("Ollama not available")
         return None
     user = config['user']
-    prompt = f"""Based on this job description and the user's profile, generate professional CV sections that highlight relevant skills and experience.
+    experiences_text = '\n'.join([f"- {exp['title']} at {exp['company']} ({exp['dates']}): {exp['description']}" for exp in user.get('experiences', [])])
+    projects_text = '\n'.join([f"- {proj['name']} ({proj['year']}): {proj['description']}" for proj in user.get('projects', [])])
+
+    prompt = rf"""Based on this job description and the user's profile, generate professional CV content tailored to the job. Select and adapt the user's experiences and projects to best match the job requirements.
 
 User Profile:
-- Skills: {', '.join(user['skills'])}
-- Experience: {user['experience']}
-- Education: {user['education']}
+- Skills: {', '.join(user.get('skills', []))}
+- Experience Summary: {user.get('experience_summary', '')}
+- Experiences:
+{experiences_text}
+- Projects:
+{projects_text}
+- Education: {user.get('education', '')}
 
 Job Description:
 {job_text}
 
-Generate CV content using specific LaTeX resume commands. Structure your response with these exact commands:
+Reply with a valid JSON object containing the following keys:
+- "education": Plain text for the education section (e.g., "Bachelor of Science in Computer Science\nUniversity of Technology\n2015\nComputer Science")
+- "experience": Plain text for the experience section (e.g., "Senior Python Developer\nTech Innovations Inc., Jan 2020 – Present\nLed the development...")
+- "projects": Plain text for the projects section (e.g., "E-commerce Platform\n2023\nDeveloped a full-featured e-commerce platform...")
+- "skills": Plain text for the skills section (e.g., "Programming Languages: Python, JavaScript, PHP\nWeb Frameworks: Django, Flask\n...")
 
-\\section{{EDUCATION}}
-\\resumeSubHeadingListStart
-    \\resumeSubheading
-        {{Institution Name}}{{City, Country}}
-        {{Degree Name}}{{Start Year - End Year}}
-        {{Relevant details like GPA, coursework, or achievements}}
-\\resumeSubHeadingListEnd
-
-\\section{{EXPERIENCE}}
-\\resumeSubHeadingListStart
-    \\resumeSubheading
-        {{Company Name}}{{City, Country}}
-        {{Job Title}}{{Start Date - End Date}}
-        {{Key responsibilities and achievements}}
-    \\resumeSubheading
-        {{Another Company}}{{Location}}
-        {{Another Job Title}}{{Dates}}
-        {{More achievements}}
-\\resumeSubHeadingListEnd
-
-\\section{{PROJECTS}}
-\\resumeSubHeadingListStart
-    \\resumeProjectHeading
-        {{Project Name}}{{Year}}
-        \\resumeSubHeadingListStart
-            \\resumeItem{{Project description and technologies}}
-            \\resumeItem{{Key achievements}}
-        \\resumeSubHeadingListEnd
-\\resumeSubHeadingListEnd
-
-\\section{{SKILLS}}
-\\begin{{minipage}}[ht]{{0.48\\textwidth}}
-\\textbf{{Programming languages:}} \\\\
-{', '.join(user['skills'])}
-\\vspace{{1em}}
-
-\\textbf{{Frameworks:}} \\\\
-Frameworks and libraries relevant to the job
-\\end{{minipage}}
-\\begin{{minipage}}[ht]{{0.48\\textwidth}}
-\\textbf{{Deployments:}} \\\\
-AWS, Kubernetes, Docker, etc.
-
-\\vspace{{1em}}
-\\textbf{{Languages:}} \\\\
-English proficiency, other languages
-\\end{{minipage}}
+Do not wrap the JSON in markdown code blocks. Output only the JSON object.
 
 Focus on tailoring content to match the job requirements. Use professional language and quantify achievements where possible."""
+    logging.debug(f"CV prompt: {prompt[:1000]}...")  # Log first 1000 chars of prompt
+    response = None
     try:
-        response = ollama.generate(model=config['model'], prompt=prompt)
-        return response['response']
+        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 60})
+        logging.debug(f"AI response: {response['response']}")
+        response_text = response['response'].strip()
+        if response_text.startswith('```json'):
+            response_text = response_text[7:]
+        if response_text.endswith('```'):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        # Remove control characters except newline and tab
+        response_text = ''.join(c for c in response_text if ord(c) >= 32 or c in '\n\t')
+        data = json.loads(response_text)
+        logging.info("CV JSON parsed successfully")
+        cv_content = rf"""\section{{EDUCATION}}
+{format_education(data['education'])}
+
+\section{{EXPERIENCE}}
+{format_experience(data['experience'])}
+
+\section{{PROJECTS}}
+{format_projects(data['projects'])}
+
+\section{{SKILLS}}
+{format_skills(data['skills'])}
+"""
+        logging.info("CV content generated")
+        return cv_content
     except Exception as e:
+        logging.error(f"Error generating CV: {e}")
+        if response:
+            logging.error(f"Response: {response['response']}")
         click.echo(f"Error generating CV: {e}")
         return None
 
 def generate_cover_letter(job_text, config):
     """Generate cover letter using Ollama"""
+    logging.info("Starting cover letter generation")
     if not check_ollama():
+        logging.error("Ollama not available")
         return None
 
     # Parse job data for better personalization
     job_data = parse_job_description(job_text)
     user = config['user']
 
+    experiences_text = '\n'.join([f"- {exp['title']} at {exp['company']} ({exp['dates']}): {exp['description']}" for exp in user.get('experiences', [])])
+
     prompt = f"""Write a compelling, personalized cover letter for the {job_data['title']} position at {job_data['company']}.
 
 User Profile:
-- Name: {user['name']}
-- Skills: {', '.join(user['skills'])}
-- Experience: {user['experience']}
-- Education: {user['education']}
+- Name: {user.get('name', '')}
+- Skills: {', '.join(user.get('skills', []))}
+- Experience Summary: {user.get('experience_summary', '')}
+- Experiences:
+{experiences_text}
+- Education: {user.get('education', '')}
 
 Job Details:
 - Position: {job_data['title']}
@@ -245,23 +312,40 @@ Job Details:
 - Key Requirements: {', '.join(job_data['requirements'][:3]) if job_data['requirements'] else 'Python development experience'}
 - Key Responsibilities: {', '.join(job_data['responsibilities'][:2]) if job_data['responsibilities'] else 'Web application development'}
 
-Write only the body text of the cover letter (2-3 paragraphs). Do not include salutation or closing. Make it highly personalized by:
+Reply with a valid JSON object containing the key "body" with the cover letter body text (2-3 paragraphs). Do not include salutation or closing. Do not wrap the JSON in markdown code blocks. Output only the JSON object. Make it highly personalized by:
 
 1. First paragraph: Express enthusiasm for the specific role and company, mention how you found the position
 2. Second paragraph: Connect your specific experience and skills to the job requirements and responsibilities
 3. Third paragraph: Explain why you're interested in this company specifically and what you can contribute
 
 Use professional, conversational language that sounds natural, not like a template. Reference specific technologies, requirements, and company details from the job description. Show genuine interest and specific knowledge about the role."""
+    logging.debug(f"Cover letter prompt: {prompt[:1000]}...")  # Log first 1000 chars of prompt
+    response = None
     try:
-        response = ollama.generate(model=config['model'], prompt=prompt)
-        return response['response']
+        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 60})
+        logging.debug(f"AI response: {response['response']}")
+        response_text = response['response'].strip()
+        if response_text.startswith('```json'):
+            response_text = response_text[7:]
+        if response_text.endswith('```'):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+        # Remove control characters except newline and tab
+        response_text = ''.join(c for c in response_text if ord(c) >= 32 or c in '\n\t')
+        data = json.loads(response_text)
+        logging.info("Cover letter JSON parsed successfully")
+        return data['body']
     except Exception as e:
+        logging.error(f"Error generating cover letter: {e}")
+        if response:
+            logging.error(f"Response: {response['response']}")
         click.echo(f"Error generating cover letter: {e}")
         return None
 
 def compile_pdf(tex_file):
     """Compile LaTeX file to PDF"""
     import subprocess
+    logging.info(f"Compiling PDF for {tex_file}")
     try:
         # Try LuaTeX first (for templates that require it), fall back to PDFLaTeX
         compilers = ['lualatex', 'pdflatex']
@@ -270,20 +354,26 @@ def compile_pdf(tex_file):
         for compiler in compilers:
             try:
                 click.echo(f"Trying {compiler}...")
+                logging.debug(f"Running {compiler} on {tex_file}")
                 result = subprocess.run([compiler, '-output-directory', str(tex_file.parent), str(tex_file)],
                                       check=True, capture_output=False, timeout=60)
                 click.echo(f"Compiled PDF with {compiler}: {tex_file.with_suffix('.pdf')}")
+                logging.info(f"PDF compiled successfully with {compiler}: {tex_file.with_suffix('.pdf')}")
                 success = True
                 break
-            except (subprocess.CalledProcessError, FileNotFoundError):
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                logging.warning(f"{compiler} failed: {e}")
                 continue
 
         if not success:
+            logging.error(f"Failed to compile PDF for {tex_file}. No suitable LaTeX compiler found.")
             click.echo(f"Failed to compile PDF for {tex_file}. No suitable LaTeX compiler found.")
 
     except subprocess.TimeoutExpired:
+        logging.error(f"PDF compilation timed out for {tex_file}")
         click.echo(f"PDF compilation timed out for {tex_file}. LaTeX may have errors.")
     except Exception as e:
+        logging.error(f"Error compiling PDF for {tex_file}: {e}")
         click.echo(f"Error compiling PDF for {tex_file}: {e}")
 
 def parse_job_description(job_text):
@@ -336,6 +426,7 @@ def parse_job_description(job_text):
 
 def render_latex(cv_content, cover_content, job_data, output_prefix, config):
     """Render LaTeX templates"""
+    logging.debug("Rendering CV and cover letter templates")
     templates_dir = Path(config['templates_dir'])
     env = Environment(loader=FileSystemLoader(templates_dir))
 
@@ -353,14 +444,17 @@ def render_latex(cv_content, cover_content, job_data, output_prefix, config):
     cv_file = cv_output_dir / f"{output_prefix}.tex"
     with open(cv_file, 'w') as f:
         f.write(cv_tex)
+    logging.info(f"CV LaTeX written to {cv_file}")
 
     # Render cover letter
     cover_tex = cover_template.render(content=cover_content, user=config['user'], job=job_data)
     cover_file = cover_output_dir / f"{output_prefix}.tex"
     with open(cover_file, 'w') as f:
         f.write(cover_tex)
+    logging.info(f"Cover letter LaTeX written to {cover_file}")
 
     # Compile PDFs
+    logging.info("Compiling PDFs")
     compile_pdf(cv_file)
     compile_pdf(cover_file)
 

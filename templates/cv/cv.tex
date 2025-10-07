@@ -7,6 +7,8 @@
 \usepackage[usenames,dvipsnames]{color}
 \usepackage{verbatim}
 \usepackage{enumitem}
+\usepackage{adjustbox}
+\usepackage{multicol}
 \usepackage{color}% http://ctan.org/pkg/color
 
 \usepackage[pdftex,colorlinks=false,pdfborderstyle={/S/U/W 1},urlbordercolor={0 0
@@ -79,12 +81,9 @@
   }
 }
 
-\newcommand{\resumeSubheading}[4]{
+\newcommand{\resumeSubheading}[1]{
   \vspace{-1pt}\item
-    \begin{tabular*}{\textwidth}[t]{l@{\extracolsep{\fill}}r}
-      \textbf{#1} & #2 \\
-      \textbf{#3} & #4 \\
-    \end{tabular*}
+    \textbf{#1}
 }
 
 \newcommand{\resumeProjectHeading}[2]{
@@ -96,6 +95,19 @@
 
 \newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]}
 \newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+
+\newcommand{\resumeSubpoint}[2]{
+  \item
+    \begin{tabular*}{\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+    \end{tabular*}
+}
+
+\newcommand{\resumeSubbullet}[1]{
+  \item\small{
+    {#1 \vspace{-1pt}}
+  }
+}
 {% endraw %}
 
 %---------------------------------------++
@@ -103,7 +115,7 @@
 
 %---------++--HEADER-------------------++
 \begin{center}
-    {\LARGE \textbf{{ user.name }}} \\
+     {\LARGE \textbf{ {{ user.name }} }} \\
     \vspace{1mm}
     \small{\href{mailto:{{ user.email }}}{{ user.email }} |
     \href{https://www.linkedin.com/in/yourprofile}{LinkedIn} |
@@ -113,7 +125,7 @@
 
 {% if job.title %}
 \begin{center}
-    \small Application for: \textbf{{ job.title }} at {{ job.company }}
+    \small Application for: \textbf{ {{ job.title }} } at {{ job.company }}
 \end{center}
 {% endif %}
 
