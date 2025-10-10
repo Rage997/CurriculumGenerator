@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV - {{ user.name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Font setup - Arial/Helvetica */
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #080808; /* text-grey */
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Page margins */
+        .page {
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 0.8in 0.5in 1.5in 0.5in;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 5pt;
+        }
+
+        .name {
+            font-size: 24pt;
+            font-weight: bold;
+            margin-bottom: 5pt;
+        }
+
+        .contact {
+            font-size: 9pt;
+            margin-bottom: 3pt;
+        }
+
+        .contact i {
+            margin-right: 2pt;
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: 15pt;
+        }
+
+        .section-title {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 8pt;
+            border-bottom: 2pt solid #d3d3d3; /* light-grey */
+            padding-bottom: 4pt;
+        }
+
+        /* Experience/Projects items */
+        .experience-list, .projects-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .experience-item, .project-item {
+            margin-bottom: 8pt;
+        }
+
+        .experience-subheading, .project-subheading, .education-subheading {
+            margin-bottom: 4pt;
+        }
+
+        .experience-row, .project-row, .education-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1pt;
+        }
+
+        .experience-company, .project-name, .education-university {
+            font-weight: bold;
+        }
+
+        .experience-dates, .experience-location, .project-year, .education-year, .education-location {
+            color: #333; /* dark-grey */
+            font-size: 9pt;
+        }
+
+        .experience-title, .education-degree {
+            font-style: italic;
+        }
+
+        .experience-description, .project-description {
+            margin-top: 4pt;
+        }
+
+        .experience-description ul, .project-description ul {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .experience-description li, .project-description li {
+            margin-bottom: 2pt;
+            font-size: 9pt;
+        }
+
+        /* Education */
+        .education-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .education-item {
+            margin-bottom: 8pt;
+        }
+
+        /* Skills */
+        .skills {
+            column-count: 2;
+            column-gap: 20pt;
+        }
+
+        .skills ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            break-inside: avoid;
+        }
+
+        .skills li {
+            margin-bottom: 2pt;
+            font-size: 9pt;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                font-size: 10pt;
+            }
+            .page {
+                margin: 0;
+                padding: 0.8in 0.5in 1.5in 0.5in;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div class="name">{{ user.name }}</div>
+            <div class="contact">
+                <i class="fas fa-phone"></i> {{ user.phone }} |
+                <i class="fas fa-envelope"></i> <a href="mailto:{{ user.email }}">{{ user.email }}</a> |
+                <i class="fab fa-linkedin"></i> <a href="{{ user.linkedin }}">{{ user.linkedin }}</a> |
+                <i class="fas fa-home"></i> <a href="{{ user.website }}">{{ user.website }}</a> |
+                <i class="fas fa-map-marker-alt"></i> {{ user.address }}
+            </div>
+        </div>
+
+        <!-- Content -->
+        {{ content }}
+    </div>
+</body>
+</html>

@@ -1,10 +1,10 @@
-model: gemma3:latest
+model: dolphin3:8b
 output_dir: output
 templates_dir: templates
 user:
-  address: Your Address
+  address: Bellinzona, Switzerland
   education: Bachelor in CS
-  email: your.email@example.com
+  email: niccolo.zuppichini@gmail.com
   experience_summary: '5+ years in
 
     development'
@@ -28,8 +28,10 @@ user:
       and PHP. Worked with MySQL databases and implemented basic CRUD operations.
       Participated in code reviews and learned version control with Git.
     title: Junior Developer
-  name: Your Name
-  phone: '+123456789'
+  linkedin: https://www.linkedin.com/in/niccolo-zuppichini
+  name: Niccolò Zuppichini
+  phone: '+41 76 275 07 06'
+  website: https://rage997.github.io/
   projects:
   - description: Built a full-featured e-commerce platform with Django backend, React
       frontend, and Stripe payment integration. Features include user authentication,

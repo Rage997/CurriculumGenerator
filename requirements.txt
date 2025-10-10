@@ -2,3 +2,4 @@ ollama
 click
 pyyaml
 jinja2
+WeasyPrint

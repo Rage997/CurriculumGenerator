@@ -1,35 +1,29 @@
-Job Title: Senior Python Developer
+About the job
+CLEEVEN is a European consulting firm founded on two fundamental convictions:
+The excellence of European engineers must drive global competitiveness.
+Our human mission is to support our consultants in their personal and professional development.
 
-Company: Tech Innovations Inc.
 
-Location: Remote
+Context & Objectives :
 
-Job Description:
+Our client operates production machines powered by a highly customized legacy C++ application on Linux. The goal is to take ownership of the legacy code (reverse engineering), analyze/fix defects, deliver targeted enhancements, and secure maintainability (documentation, tests, tooling).
 
-We are looking for a Senior Python Developer to join our dynamic team. The ideal candidate will have strong experience in Python development, web frameworks like Django or Flask, and database management.
 
-Key Responsibilities:
-- Develop and maintain web applications using Python
-- Design and implement RESTful APIs
-- Work with databases (PostgreSQL, MongoDB)
-- Collaborate with frontend developers
-- Write clean, efficient, and well-documented code
+Key Responsibilities : 
 
-Requirements:
-- 5+ years of Python development experience
-- Proficiency in Django or Flask
-- Experience with SQL and NoSQL databases
-- Knowledge of version control (Git)
-- Familiarity with cloud platforms (AWS, GCP)
-- Strong problem-solving skills
+Perform a technical audit of the codebase: module/dependency map, build chain, hot spots (concurrency, I/O, memory).
+Conduct reverse engineering of critical components (code reading, tracing, instrumentation; disassembly if required).
+Fix priority issues (stability, performance, leaks) and implement requested functional changes.
+Produce and maintain technical documentation (README, install procedures, release notes) and ensure knowledge transfer to the client team.
+Collaborate with OT/production for on-bench/line validation, deployment and rollback plans.
 
-Nice to have:
-- Experience with Docker and Kubernetes
-- Knowledge of machine learning libraries (TensorFlow, PyTorch)
-- Agile development experience
 
-Benefits:
-- Competitive salary
-- Remote work options
-- Health insurance
-- Professional development opportunities
+Profile :
+
+2–3+ years with C++ on Linux
+Systems background (processes, threads, synchronization, networking, files, serial) and performance tuning.
+Comfortable with legacy code reading and incremental refactoring; reliability mindset in industrial environments.
+Experience with static analysis (clang-tidy, cppcheck), Git, and CI (GitLab/Azure DevOps).
+Nice to have: drivers/fieldbus (Modbus/CAN/OPC UA), Python/Bash scripting, cross-compilation, containers (Docker).
+Industrial context (manufacturing/pharma/life sciences) and basic GxP/CSV awareness are appreciated.
+English Mandatory / German is a huge plus

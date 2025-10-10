@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cover Letter - {{ user.name }}</title>
+    <style>
+        body {
+            font-family: Times New Roman, serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .page {
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 1in;
+        }
+
+        .sender-address {
+            text-align: right;
+            margin-bottom: 1cm;
+        }
+
+        .date {
+            margin-bottom: 1cm;
+        }
+
+        .recipient-address {
+            margin-bottom: 1cm;
+        }
+
+        .recipient-address strong {
+            display: block;
+        }
+
+        .salutation {
+            margin-bottom: 0.5cm;
+        }
+
+        .content {
+            margin-bottom: 1cm;
+            text-align: justify;
+        }
+
+        .closing {
+            margin-bottom: 0.5cm;
+        }
+
+        .signature {
+            margin-top: 0.5cm;
+        }
+
+        /* Print styles */
+        @media print {
+            .page {
+                margin: 0;
+                padding: 1in;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- Sender's address -->
+        <div class="sender-address">
+            {{ user.name }}<br>
+            {{ user.address }}<br>
+            {{ user.email }}<br>
+            {{ user.phone }}
+        </div>
+
+        <!-- Date -->
+        <div class="date">
+            {{ job.date or "October 10, 2025" }}
+        </div>
+
+        <!-- Recipient's address -->
+        <div class="recipient-address">
+            <strong>Hiring Manager</strong>
+            <strong>{{ job.company or "Company" }}</strong>
+            <strong>{{ job.location or "Location" }}</strong>
+        </div>
+
+        <!-- Salutation -->
+        <div class="salutation">
+            Dear Hiring Manager,
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            {{ content }}
+        </div>
+
+        <!-- Closing -->
+        <div class="closing">
+            Thank you for considering my application. I would welcome the opportunity to discuss how my skills and experience can contribute to {{ job.company }}'s success.
+        </div>
+
+        <!-- Signature -->
+        <div class="signature">
+            Sincerely,<br><br>
+            {{ user.name }}
+        </div>
+    </div>
+</body>
+</html>

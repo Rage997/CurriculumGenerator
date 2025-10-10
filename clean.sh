@@ -1,2 +1,1 @@
-rm output/cover_letter/*
-rm output/cv/*
+rm -f output/cover_letter/* output/cv/*

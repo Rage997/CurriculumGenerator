@@ -110,7 +110,8 @@ def models():
 @click.argument('job_description', type=click.File('r'))
 @click.option('--output', '-o', help='Output file prefix')
 @click.option('--dry-run', is_flag=True, help='Generate templates without AI content')
-def generate(job_description, output, dry_run):
+@click.option('--skill-modification-level', type=float, default=0.5, help='Level of skill modification based on job description (0.0 to 1.0)')
+def generate(job_description, output, dry_run, skill_modification_level):
     """Generate CV and cover letter from job description"""
     config = load_config()
     job_text = job_description.read()
@@ -123,14 +124,14 @@ def generate(job_description, output, dry_run):
     else:
         # Generate CV
         click.echo("Generating CV...")
-        cv_content = generate_cv(job_text, config)
+        cv_content = generate_cv(job_text, config, skill_modification_level)
         if cv_content is None:
             return
         click.echo("CV generated.")
 
         # Generate cover letter
         click.echo("Generating cover letter...")
-        cover_content = generate_cover_letter(job_text, config)
+        cover_content = generate_cover_letter(job_text, config, skill_modification_level)
         if cover_content is None:
             return
         click.echo("Cover letter generated.")
@@ -139,10 +140,10 @@ def generate(job_description, output, dry_run):
     job_data = parse_job_description(job_text)
     logging.debug(f"Parsed job data: {job_data}")
 
-    # Render LaTeX
-    click.echo("Rendering LaTeX...")
-    logging.info("Rendering LaTeX templates")
-    render_latex(cv_content, cover_content, job_data, output or 'generated', config)
+    # Render HTML and generate PDFs
+    click.echo("Rendering HTML and generating PDFs...")
+    logging.info("Rendering HTML templates and generating PDFs")
+    render_html(cv_content, cover_content, job_data, output or 'generated', config)
 
     click.echo(f"Generated CV and cover letter in {config['output_dir']}/cv and {config['output_dir']}/cover_letter")
     logging.info(f"Generation completed. Output in {config['output_dir']}")
@@ -150,7 +151,9 @@ def generate(job_description, output, dry_run):
 def check_ollama():
     """Check if Ollama is running and accessible"""
     try:
+        print("Calling ollama.list()")
         ollama.list()
+        print("ollama.list() done")
         return True
     except Exception as e:
         click.echo(f"Error connecting to Ollama: {e}")
@@ -169,11 +172,25 @@ def list_models():
 def format_education(text):
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     if len(lines) >= 3:
-        degree = escape_latex(lines[0])
-        university = escape_latex(lines[1])
-        year = escape_latex(lines[2])
-        return rf"\resumeSubHeadingListStart\resumeSubheading{{{degree}}}\resumeSubpoint{{{university}}}{{{year}}}\resumeSubHeadingListEnd"
-    return escape_latex(text)
+        degree = lines[0]
+        university = lines[1]
+        year = lines[2]
+        location = lines[3] if len(lines) > 3 else 'Location'
+        return f"""
+<div class="education-item">
+    <div class="education-subheading">
+        <div class="education-row">
+            <div class="education-university">{university}</div>
+            <div class="education-year">{year}</div>
+        </div>
+        <div class="education-row">
+            <div class="education-degree">{degree}</div>
+            <div class="education-location">{location}</div>
+        </div>
+    </div>
+</div>
+        """.strip()
+    return text
 
 def format_experience(text):
     jobs = text.split('\n\n')
@@ -181,13 +198,44 @@ def format_experience(text):
     for job in jobs:
         lines = [line.strip() for line in job.split('\n') if line.strip()]
         if len(lines) >= 2:
-            title = escape_latex(lines[0])
-            company_dates = escape_latex(lines[1])
+            title = lines[0]
+            company_dates = lines[1]
+            # Parse company and dates
+            parts = company_dates.split(', ')
+            if len(parts) >= 2:
+                company = parts[0]
+                dates = ', '.join(parts[1:])
+            else:
+                company = company_dates
+                dates = ''
+            location = 'Remote'  # Default location
             description = ' '.join(lines[2:])
             items = [item.strip() for item in description.split('. ') if item.strip()]
-            item_str = ''.join(rf"\resumeItem{{{escape_latex(item)}}}" for item in items)
-            result += rf"\resumeSubheading{{{title}}}\resumeSubheading{{{company_dates}}}{item_str}"
-    return rf"\resumeSubHeadingListStart{result}\resumeSubHeadingListEnd"
+            # Clean up bullet points that start with "- "
+            cleaned_items = []
+            for item in items:
+                if item.startswith('- '):
+                    item = item[2:]
+                cleaned_items.append(item)
+            item_str = ''.join(f"<li>{item}</li>" for item in cleaned_items)
+            result += f"""
+<div class="experience-item">
+    <div class="experience-subheading">
+        <div class="experience-row">
+            <div class="experience-company">{company}</div>
+            <div class="experience-dates">{dates}</div>
+        </div>
+        <div class="experience-row">
+            <div class="experience-title">{title}</div>
+            <div class="experience-location">{location}</div>
+        </div>
+    </div>
+    <div class="experience-description">
+        <ul>{item_str}</ul>
+    </div>
+</div>
+            """.strip()
+    return f'<div class="experience-list">{result}</div>'
 
 def format_projects(text):
     projects = text.split('\n\n')
@@ -195,25 +243,38 @@ def format_projects(text):
     for proj in projects:
         lines = [line.strip() for line in proj.split('\n') if line.strip()]
         if len(lines) >= 2:
-            name = escape_latex(lines[0])
-            year = escape_latex(lines[1])
+            name = lines[0]
+            year = lines[1]
             description = ' '.join(lines[2:])
             items = [item.strip() for item in description.split('. ') if item.strip()]
-            item_str = ''.join(rf"\resumeSubbullet{{{escape_latex(item)}}}" for item in items)
-            result += rf"\resumeSubheading{{{name} ({year})}}{item_str}"
-    return rf"\resumeSubHeadingListStart{result}\resumeSubHeadingListEnd"
+            # Clean up bullet points that start with "- "
+            cleaned_items = []
+            for item in items:
+                if item.startswith('- '):
+                    item = item[2:]
+                cleaned_items.append(item)
+            item_str = ''.join(f"<li>{item}</li>" for item in cleaned_items)
+            result += f"""
+<div class="project-item">
+    <div class="project-subheading">
+        <div class="project-row">
+            <div class="project-name">{name} ({year})</div>
+            <div></div>
+        </div>
+    </div>
+    <div class="project-description">
+        <ul>{item_str}</ul>
+    </div>
+</div>
+            """.strip()
+    return f'<div class="projects-list">{result}</div>'
 
 def format_skills(text):
     lines = [line.strip() for line in text.split('\n') if line.strip()]
-    skills = []
-    for line in lines:
-        if ':' in line:
-            _, s = line.split(':', 1)
-            skills.extend([sk.strip() for sk in s.split(',') if sk.strip()])
-    item_str = ''.join(rf"\item {escape_latex(skill)}" for skill in skills)
-    return rf"\begin{{multicols}}{{2}}\begin{{itemize}}[leftmargin=0em]{item_str}\end{{itemize}}\end{{multicols}}"
+    item_str = ''.join(f"<li>{line}</li>" for line in lines if line)
+    return f'<div class="skills"><ul>{item_str}</ul></div>'
 
-def generate_cv(job_text, config):
+def generate_cv(job_text, config, skill_modification_level):
     """Generate CV content using Ollama"""
     logging.info("Starting CV generation")
     if not check_ollama():
@@ -223,33 +284,42 @@ def generate_cv(job_text, config):
     experiences_text = '\n'.join([f"- {exp['title']} at {exp['company']} ({exp['dates']}): {exp['description']}" for exp in user.get('experiences', [])])
     projects_text = '\n'.join([f"- {proj['name']} ({proj['year']}): {proj['description']}" for proj in user.get('projects', [])])
 
+    # Parse job to get skills
+    job_data = parse_job_description(job_text)
+    job_skills = job_data['technologies']
+    user_skills = user.get('skills', [])
+    num_to_add = int(len(job_skills) * skill_modification_level)
+    skills_to_add = job_skills[:num_to_add]
+    modified_skills = user_skills + [s for s in skills_to_add if s not in user_skills]
+
     prompt = rf"""Based on this job description and the user's profile, generate professional CV content tailored to the job. Select and adapt the user's experiences and projects to best match the job requirements.
 
-User Profile:
-- Skills: {', '.join(user.get('skills', []))}
-- Experience Summary: {user.get('experience_summary', '')}
-- Experiences:
-{experiences_text}
-- Projects:
-{projects_text}
-- Education: {user.get('education', '')}
+    User Profile:
+    - Skills: {', '.join(modified_skills)}
+    - Experience Summary: {user.get('experience_summary', '')}
+    - Experiences:
+    {experiences_text}
+    - Projects:
+    {projects_text}
+    - Education: {user.get('education', '')}
 
-Job Description:
-{job_text}
+    Job Description:
+    {job_text}
 
-Reply with a valid JSON object containing the following keys:
-- "education": Plain text for the education section (e.g., "Bachelor of Science in Computer Science\nUniversity of Technology\n2015\nComputer Science")
-- "experience": Plain text for the experience section (e.g., "Senior Python Developer\nTech Innovations Inc., Jan 2020 – Present\nLed the development...")
-- "projects": Plain text for the projects section (e.g., "E-commerce Platform\n2023\nDeveloped a full-featured e-commerce platform...")
-- "skills": Plain text for the skills section (e.g., "Programming Languages: Python, JavaScript, PHP\nWeb Frameworks: Django, Flask\n...")
+    Reply with a valid JSON object containing the following keys:
+    - "education": Plain text for the education section (e.g., "Bachelor of Science in Computer Science\nUniversity of Technology\n2015\nComputer Science")
+    - "experience": Plain text for the experience section (e.g., "Senior Python Developer\nTech Innovations Inc., Jan 2020 – Present\nLed the development...")
+    - "projects": Plain text for the projects section (e.g., "E-commerce Platform\n2023\nDeveloped a full-featured e-commerce platform...")
+    - "skills": Plain text for the skills section (e.g., "Programming Languages: Python, JavaScript, PHP\nWeb Frameworks: Django, Flask\n...")
 
-Do not wrap the JSON in markdown code blocks. Output only the JSON object.
+    Do not wrap the JSON in markdown code blocks. Output only the JSON object.
 
-Focus on tailoring content to match the job requirements. Use professional language and quantify achievements where possible."""
+    Focus on tailoring content to match the job requirements. Use professional language and quantify achievements where possible."""
+    
     logging.debug(f"CV prompt: {prompt[:1000]}...")  # Log first 1000 chars of prompt
     response = None
     try:
-        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 60})
+        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 120})
         logging.debug(f"AI response: {response['response']}")
         response_text = response['response'].strip()
         if response_text.startswith('```json'):
@@ -259,20 +329,37 @@ Focus on tailoring content to match the job requirements. Use professional langu
         response_text = response_text.strip()
         # Remove control characters except newline and tab
         response_text = ''.join(c for c in response_text if ord(c) >= 32 or c in '\n\t')
+
+        # Try to extract JSON if it's embedded in text
+        start = response_text.find('{')
+        end = response_text.rfind('}') + 1
+        if start != -1 and end > start:
+            response_text = response_text[start:end]
+
         data = json.loads(response_text)
         logging.info("CV JSON parsed successfully")
-        cv_content = rf"""\section{{EDUCATION}}
-{format_education(data['education'])}
+        cv_content = f"""
+<div class="section">
+    <div class="section-title">EDUCATION</div>
+    {format_education(data['education'])}
+</div>
 
-\section{{EXPERIENCE}}
-{format_experience(data['experience'])}
+<div class="section">
+    <div class="section-title">EXPERIENCE</div>
+    {format_experience(data['experience'])}
+</div>
 
-\section{{PROJECTS}}
-{format_projects(data['projects'])}
+<div class="section">
+    <div class="section-title">PROJECTS</div>
+    {format_projects(data['projects'])}
+</div>
 
-\section{{SKILLS}}
-{format_skills(data['skills'])}
-"""
+<div class="section">
+    <div class="section-title">SKILLS</div>
+    {format_skills(data['skills'])}
+</div>
+        """
+        
         logging.info("CV content generated")
         return cv_content
     except Exception as e:
@@ -282,7 +369,7 @@ Focus on tailoring content to match the job requirements. Use professional langu
         click.echo(f"Error generating CV: {e}")
         return None
 
-def generate_cover_letter(job_text, config):
+def generate_cover_letter(job_text, config, skill_modification_level):
     """Generate cover letter using Ollama"""
     logging.info("Starting cover letter generation")
     if not check_ollama():
@@ -295,34 +382,42 @@ def generate_cover_letter(job_text, config):
 
     experiences_text = '\n'.join([f"- {exp['title']} at {exp['company']} ({exp['dates']}): {exp['description']}" for exp in user.get('experiences', [])])
 
+    # Modify skills
+    job_skills = job_data['technologies']
+    user_skills = user.get('skills', [])
+    num_to_add = int(len(job_skills) * skill_modification_level)
+    skills_to_add = job_skills[:num_to_add]
+    modified_skills = user_skills + [s for s in skills_to_add if s not in user_skills]
+
     prompt = f"""Write a compelling, personalized cover letter for the {job_data['title']} position at {job_data['company']}.
 
-User Profile:
-- Name: {user.get('name', '')}
-- Skills: {', '.join(user.get('skills', []))}
-- Experience Summary: {user.get('experience_summary', '')}
-- Experiences:
-{experiences_text}
-- Education: {user.get('education', '')}
+    User Profile:
+    - Name: {user.get('name', '')}
+    - Skills: {', '.join(modified_skills)}
+    - Experience Summary: {user.get('experience_summary', '')}
+    - Experiences:
+    {experiences_text}
+    - Education: {user.get('education', '')}
 
-Job Details:
-- Position: {job_data['title']}
-- Company: {job_data['company']}
-- Location: {job_data['location']}
-- Key Requirements: {', '.join(job_data['requirements'][:3]) if job_data['requirements'] else 'Python development experience'}
-- Key Responsibilities: {', '.join(job_data['responsibilities'][:2]) if job_data['responsibilities'] else 'Web application development'}
+    Job Details:
+    - Position: {job_data['title']}
+    - Company: {job_data['company']}
+    - Location: {job_data['location']}
+    - Key Requirements: {', '.join(job_data['requirements'][:3]) if job_data['requirements'] else 'Python development experience'}
+    - Key Responsibilities: {', '.join(job_data['responsibilities'][:2]) if job_data['responsibilities'] else 'Web application development'}
 
-Reply with a valid JSON object containing the key "body" with the cover letter body text (2-3 paragraphs). Do not include salutation or closing. Do not wrap the JSON in markdown code blocks. Output only the JSON object. Make it highly personalized by:
+    Reply with a valid JSON object containing the key "body" with the cover letter body text (2-3 paragraphs). Do not include salutation or closing. Do not wrap the JSON in markdown code blocks. Output only the JSON object. Make it highly personalized by:
 
-1. First paragraph: Express enthusiasm for the specific role and company, mention how you found the position
-2. Second paragraph: Connect your specific experience and skills to the job requirements and responsibilities
-3. Third paragraph: Explain why you're interested in this company specifically and what you can contribute
+    1. First paragraph: Formally express enthusiasm for the specific role and company.
+    2. Second paragraph: Connect your specific experience and skills to the job requirements and responsibilities
+    3. Third paragraph: Explain why you're interested in this company specifically and what you can contribute
 
-Use professional, conversational language that sounds natural, not like a template. Reference specific technologies, requirements, and company details from the job description. Show genuine interest and specific knowledge about the role."""
+    Use professional, conversational language that sounds natural, not like a template. Reference specific technologies, requirements, and company details from the job description. Show genuine interest and specific knowledge about the role."""
+    
     logging.debug(f"Cover letter prompt: {prompt[:1000]}...")  # Log first 1000 chars of prompt
     response = None
     try:
-        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 60})
+        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 120})
         logging.debug(f"AI response: {response['response']}")
         response_text = response['response'].strip()
         if response_text.startswith('```json'):
@@ -332,6 +427,13 @@ Use professional, conversational language that sounds natural, not like a templa
         response_text = response_text.strip()
         # Remove control characters except newline and tab
         response_text = ''.join(c for c in response_text if ord(c) >= 32 or c in '\n\t')
+
+        # Try to extract JSON if it's embedded in text
+        start = response_text.find('{')
+        end = response_text.rfind('}') + 1
+        if start != -1 and end > start:
+            response_text = response_text[start:end]
+
         data = json.loads(response_text)
         logging.info("Cover letter JSON parsed successfully")
         return data['body']
@@ -342,46 +444,35 @@ Use professional, conversational language that sounds natural, not like a templa
         click.echo(f"Error generating cover letter: {e}")
         return None
 
-def compile_pdf(tex_file):
-    """Compile LaTeX file to PDF"""
-    import subprocess
-    logging.info(f"Compiling PDF for {tex_file}")
-    try:
-        # Try LuaTeX first (for templates that require it), fall back to PDFLaTeX
-        compilers = ['lualatex', 'pdflatex']
-        success = False
 
-        for compiler in compilers:
-            try:
-                click.echo(f"Trying {compiler}...")
-                logging.debug(f"Running {compiler} on {tex_file}")
-                result = subprocess.run([compiler, '-output-directory', str(tex_file.parent), str(tex_file)],
-                                      check=True, capture_output=False, timeout=60)
-                click.echo(f"Compiled PDF with {compiler}: {tex_file.with_suffix('.pdf')}")
-                logging.info(f"PDF compiled successfully with {compiler}: {tex_file.with_suffix('.pdf')}")
-                success = True
-                break
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                logging.warning(f"{compiler} failed: {e}")
-                continue
 
-        if not success:
-            logging.error(f"Failed to compile PDF for {tex_file}. No suitable LaTeX compiler found.")
-            click.echo(f"Failed to compile PDF for {tex_file}. No suitable LaTeX compiler found.")
-
-    except subprocess.TimeoutExpired:
-        logging.error(f"PDF compilation timed out for {tex_file}")
-        click.echo(f"PDF compilation timed out for {tex_file}. LaTeX may have errors.")
-    except Exception as e:
-        logging.error(f"Error compiling PDF for {tex_file}: {e}")
-        click.echo(f"Error compiling PDF for {tex_file}: {e}")
+def extract_skills_from_text(text):
+    """Extract potential skills from text using common tech keywords"""
+    common_skills = [
+        'Python', 'Java', 'JavaScript', 'C++', 'C#', 'Ruby', 'PHP', 'Go', 'Rust', 'Swift', 'Kotlin',
+        'Django', 'Flask', 'React', 'Angular', 'Vue', 'Node.js', 'Express', 'Spring', 'Laravel',
+        'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'SQLite', 'Oracle', 'SQL Server',
+        'AWS', 'GCP', 'Azure', 'Docker', 'Kubernetes', 'Terraform', 'Ansible',
+        'Git', 'GitHub', 'GitLab', 'Jenkins', 'Travis CI', 'CircleCI',
+        'Linux', 'Ubuntu', 'CentOS', 'Windows', 'macOS',
+        'HTML', 'CSS', 'SASS', 'SCSS', 'Bootstrap', 'Tailwind',
+        'TensorFlow', 'PyTorch', 'Scikit-learn', 'Pandas', 'NumPy', 'Matplotlib',
+        'REST', 'GraphQL', 'API', 'Microservices', 'SOA',
+        'Agile', 'Scrum', 'Kanban', 'TDD', 'BDD'
+    ]
+    found_skills = set()
+    text_lower = text.lower()
+    for skill in common_skills:
+        if skill.lower() in text_lower:
+            found_skills.add(skill)
+    return list(found_skills)
 
 def parse_job_description(job_text):
     """Parse job description to extract key information"""
     job_data = {
-        'title': 'Position',
+        'title': 'Software Developer',
         'company': 'Company',
-        'location': 'Location',
+        'location': 'Remote',
         'requirements': [],
         'responsibilities': [],
         'benefits': [],
@@ -390,6 +481,16 @@ def parse_job_description(job_text):
 
     lines = job_text.split('\n')
     current_section = None
+
+    # Try to extract company from the first meaningful line
+    for line in lines[:5]:  # Check first 5 lines
+        line = line.strip()
+        if line and not line.lower().startswith('about') and len(line) > 10:
+            # Look for company name patterns
+            words = line.split()
+            if len(words) > 0 and words[0].isupper() and len(words[0]) > 3:
+                job_data['company'] = words[0]
+                break
 
     for line in lines:
         line = line.strip()
@@ -422,41 +523,61 @@ def parse_job_description(job_text):
             if current_section in job_data:
                 job_data[current_section].append(content)
 
+    # Extract skills from the entire job text
+    job_data['technologies'] = extract_skills_from_text(job_text)
+
     return job_data
 
-def render_latex(cv_content, cover_content, job_data, output_prefix, config):
-    """Render LaTeX templates"""
+def render_html(cv_content, cover_content, job_data, output_prefix, config):
+    """Render HTML templates and generate PDFs using WeasyPrint"""
     logging.debug("Rendering CV and cover letter templates")
-    templates_dir = Path(config['templates_dir'])
-    env = Environment(loader=FileSystemLoader(templates_dir))
+    try:
+        from weasyprint import HTML
 
-    cv_template = env.get_template('cv/cv.tex')
-    cover_template = env.get_template('cover_letter/cover_letter.tex')
+        templates_dir = Path(config['templates_dir'])
+        env = Environment(loader=FileSystemLoader(templates_dir))
 
-    output_dir = Path(config['output_dir'])
-    cv_output_dir = output_dir / 'cv'
-    cover_output_dir = output_dir / 'cover_letter'
-    cv_output_dir.mkdir(parents=True, exist_ok=True)
-    cover_output_dir.mkdir(parents=True, exist_ok=True)
+        cv_template = env.get_template('cv/cv.html')
+        cover_template = env.get_template('cover_letter/cover_letter.html')
 
-    # Render CV
-    cv_tex = cv_template.render(content=cv_content, user=config['user'], job=job_data)
-    cv_file = cv_output_dir / f"{output_prefix}.tex"
-    with open(cv_file, 'w') as f:
-        f.write(cv_tex)
-    logging.info(f"CV LaTeX written to {cv_file}")
+        output_dir = Path(config['output_dir'])
+        cv_output_dir = output_dir / 'cv'
+        cover_output_dir = output_dir / 'cover_letter'
+        cv_output_dir.mkdir(parents=True, exist_ok=True)
+        cover_output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Render cover letter
-    cover_tex = cover_template.render(content=cover_content, user=config['user'], job=job_data)
-    cover_file = cover_output_dir / f"{output_prefix}.tex"
-    with open(cover_file, 'w') as f:
-        f.write(cover_tex)
-    logging.info(f"Cover letter LaTeX written to {cover_file}")
+        # Render CV
+        cv_html = cv_template.render(content=cv_content, user=config['user'], job=job_data)
+        cv_html_file = cv_output_dir / f"{output_prefix}.html"
+        with open(cv_html_file, 'w') as f:
+            f.write(cv_html)
+        logging.info(f"CV HTML written to {cv_html_file}")
 
-    # Compile PDFs
-    logging.info("Compiling PDFs")
-    compile_pdf(cv_file)
-    compile_pdf(cover_file)
+        # Generate CV PDF
+        cv_pdf_file = cv_output_dir / f"{output_prefix}.pdf"
+        HTML(string=cv_html).write_pdf(cv_pdf_file)
+        logging.info(f"CV PDF generated: {cv_pdf_file}")
+
+        # Add current date to job_data for cover letter
+        import datetime
+        job_data_with_date = job_data.copy()
+        job_data_with_date['date'] = datetime.datetime.now().strftime('%B %d, %Y')
+
+        # Render cover letter
+        cover_html = cover_template.render(content=cover_content, user=config['user'], job=job_data_with_date)
+        cover_html_file = cover_output_dir / f"{output_prefix}.html"
+        with open(cover_html_file, 'w') as f:
+            f.write(cover_html)
+        logging.info(f"Cover letter HTML written to {cover_html_file}")
+
+        # Generate cover letter PDF
+        cover_pdf_file = cover_output_dir / f"{output_prefix}.pdf"
+        HTML(string=cover_html).write_pdf(cover_pdf_file)
+        logging.info(f"Cover letter PDF generated: {cover_pdf_file}")
+
+    except Exception as e:
+        print("Error in render_html:", e)
+        raise
 
 if __name__ == '__main__':
     cli()
