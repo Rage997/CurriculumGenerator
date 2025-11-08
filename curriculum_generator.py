@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 import ollama
 from jinja2 import Environment, FileSystemLoader
+from markupsafe import Markup
 
 def escape_latex(text):
     """Escape LaTeX special characters in text."""
@@ -176,21 +177,22 @@ def format_education(text):
         university = lines[1]
         year = lines[2]
         location = lines[3] if len(lines) > 3 else 'Location'
-        return f"""
-<div class="education-item">
-    <div class="education-subheading">
-        <div class="education-row">
-            <div class="education-university">{university}</div>
-            <div class="education-year">{year}</div>
-        </div>
-        <div class="education-row">
-            <div class="education-degree">{degree}</div>
-            <div class="education-location">{location}</div>
-        </div>
-    </div>
-</div>
+        education_html = f"""
+            <div class="education-item">
+                <div class="education-subheading">
+                    <div class="education-row">
+                        <div class="education-university">{university}</div>
+                        <div class="education-year">{year}</div>
+                    </div>
+                    <div class="education-row">
+                        <div class="education-degree">{degree}</div>
+                        <div class="education-location">{location}</div>
+                    </div>
+                </div>
+            </div>
         """.strip()
-    return text
+        return Markup(education_html)
+    return Markup(text)  # Return as Markup even if simple text
 
 def format_experience(text):
     jobs = text.split('\n\n')
@@ -219,23 +221,23 @@ def format_experience(text):
                 cleaned_items.append(item)
             item_str = ''.join(f"<li>{item}</li>" for item in cleaned_items)
             result += f"""
-<div class="experience-item">
-    <div class="experience-subheading">
-        <div class="experience-row">
-            <div class="experience-company">{company}</div>
-            <div class="experience-dates">{dates}</div>
-        </div>
-        <div class="experience-row">
-            <div class="experience-title">{title}</div>
-            <div class="experience-location">{location}</div>
-        </div>
-    </div>
-    <div class="experience-description">
-        <ul>{item_str}</ul>
-    </div>
-</div>
+                <div class="experience-item">
+                    <div class="experience-subheading">
+                        <div class="experience-row">
+                            <div class="experience-company">{company}</div>
+                            <div class="experience-dates">{dates}</div>
+                        </div>
+                        <div class="experience-row">
+                            <div class="experience-title">{title}</div>
+                            <div class="experience-location">{location}</div>
+                        </div>
+                    </div>
+                    <div class="experience-description">
+                        <ul>{item_str}</ul>
+                    </div>
+                </div>
             """.strip()
-    return f'<div class="experience-list">{result}</div>'
+    return Markup(f'<div class="experience-list">{result}</div>')
 
 def format_projects(text):
     projects = text.split('\n\n')
@@ -255,24 +257,32 @@ def format_projects(text):
                 cleaned_items.append(item)
             item_str = ''.join(f"<li>{item}</li>" for item in cleaned_items)
             result += f"""
-<div class="project-item">
-    <div class="project-subheading">
-        <div class="project-row">
-            <div class="project-name">{name} ({year})</div>
-            <div></div>
-        </div>
-    </div>
-    <div class="project-description">
-        <ul>{item_str}</ul>
-    </div>
-</div>
+                <div class="project-item">
+                    <div class="project-subheading">
+                        <div class="project-row">
+                            <div class="project-name">{name} ({year})</div>
+                            <div></div>
+                        </div>
+                    </div>
+                    <div class="project-description">
+                        <ul>{item_str}</ul>
+                    </div>
+                </div>
             """.strip()
-    return f'<div class="projects-list">{result}</div>'
+    return Markup(f'<div class="projects-list">{result}</div>')
 
 def format_skills(text):
     lines = [line.strip() for line in text.split('\n') if line.strip()]
-    item_str = ''.join(f"<li>{line}</li>" for line in lines if line)
-    return f'<div class="skills"><ul>{item_str}</ul></div>'
+    half = (len(lines) + 1) // 2
+    col1 = ''.join(f"<li>{line}</li>" for line in lines[:half])
+    col2 = ''.join(f"<li>{line}</li>" for line in lines[half:])
+    skills_html = f'''
+        <div class="skills">
+        <ul>{col1}</ul>
+        <ul>{col2}</ul>
+        </div>
+    '''.strip()
+    return Markup(skills_html)
 
 def generate_cv(job_text, config, skill_modification_level):
     """Generate CV content using Ollama"""
@@ -339,29 +349,29 @@ def generate_cv(job_text, config, skill_modification_level):
         data = json.loads(response_text)
         logging.info("CV JSON parsed successfully")
         cv_content = f"""
-<div class="section">
-    <div class="section-title">EDUCATION</div>
-    {format_education(data['education'])}
-</div>
+            <div class="section">
+                <div class="section-title">EDUCATION</div>
+                {format_education(data['education'])}
+            </div>
 
-<div class="section">
-    <div class="section-title">EXPERIENCE</div>
-    {format_experience(data['experience'])}
-</div>
+            <div class="section">
+                <div class="section-title">EXPERIENCE</div>
+                {format_experience(data['experience'])}
+            </div>
 
-<div class="section">
-    <div class="section-title">PROJECTS</div>
-    {format_projects(data['projects'])}
-</div>
+            <div class="section">
+                <div class="section-title">PROJECTS</div>
+                {format_projects(data['projects'])}
+            </div>
 
-<div class="section">
-    <div class="section-title">SKILLS</div>
-    {format_skills(data['skills'])}
-</div>
+            <div class="section">
+                <div class="section-title">SKILLS</div>
+                {format_skills(data['skills'])}
+            </div>
         """
         
         logging.info("CV content generated")
-        return cv_content
+        return Markup(cv_content)  # Return as Markup
     except Exception as e:
         logging.error(f"Error generating CV: {e}")
         if response:

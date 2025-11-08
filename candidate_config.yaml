@@ -2,9 +2,9 @@ model: dolphin3:8b
 output_dir: output
 templates_dir: templates
 user:
-  address: Bellinzona, Switzerland
+  address: Zurich, Switzerland
   education: Bachelor in CS
-  email: niccolo.zuppichini@gmail.com
+  email: name.surname@mail.com
   experience_summary: '5+ years in
 
     development'

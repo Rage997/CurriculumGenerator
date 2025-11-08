@@ -20,7 +20,7 @@
         .page {
             max-width: 8.5in;
             margin: 0 auto;
-            padding: 0.8in 0.5in 1.5in 0.5in;
+            padding: 0.5in;
         }
 
         /* Header */
@@ -119,19 +119,21 @@
 
         /* Skills */
         .skills {
-            column-count: 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* two equal-width columns */
             column-gap: 20pt;
+            row-gap: 4pt;
+            margin-top: 6pt;
         }
 
         .skills ul {
             list-style: none;
             padding: 0;
             margin: 0;
-            break-inside: avoid;
         }
 
         .skills li {
-            margin-bottom: 2pt;
+            margin-bottom: 3pt;
             font-size: 9pt;
         }
 
@@ -142,7 +144,7 @@
             }
             .page {
                 margin: 0;
-                padding: 0.8in 0.5in 1.5in 0.5in;
+                padding: 0.5in;
             }
         }
     </style>
