@@ -1,0 +1,14 @@
+[project]
+name = "curriculum-generator"
+version = "0.1.0"
+description = "Generate customized CVs and cover letters using a local LLM (llama.cpp) based on job descriptions and user profiles."
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "markupsafe>=2.1",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "weasyprint>=62",
+]

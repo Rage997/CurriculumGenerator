@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Curriculum AI Generator using Ollama
+Curriculum AI Generator using a local llama.cpp server (OpenAI-compatible API)
 """
 
 import click
@@ -9,7 +9,8 @@ import os
 import json
 import logging
 from pathlib import Path
-import ollama
+import requests
+from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 from markupsafe import Markup
 
@@ -33,32 +34,67 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Load configuration
-CONFIG_FILE = Path(__file__).parent / 'candidate_config.yaml'
+# Load configuration: .env for server/generation settings, YAML for the user profile
+BASE_DIR = Path(__file__).parent
+load_dotenv(BASE_DIR / '.env')
+
+ENV_FILE = BASE_DIR / '.env'
+CONFIG_FILE = BASE_DIR / 'candidate_config.yaml'
 
 
-def load_config():
+def get_config():
+    """Server and generation settings from environment variables (see .env)."""
+    return {
+        'base_url': os.environ.get('LLM_BASE_URL', 'http://localhost:8080').rstrip('/'),
+        'model': os.environ.get('LLM_MODEL', ''),
+        'api_key': os.environ.get('LLM_API_KEY', ''),
+        'max_tokens': int(os.environ.get('LLM_MAX_TOKENS', '2048')),
+        'timeout': int(os.environ.get('LLM_TIMEOUT', '300')),
+        'enable_thinking': os.environ.get('LLM_ENABLE_THINKING', 'false').lower() == 'true',
+        'output_dir': os.environ.get('OUTPUT_DIR', 'output'),
+        'templates_dir': os.environ.get('TEMPLATES_DIR', 'templates'),
+    }
+
+
+def load_profile():
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, 'r') as f:
-            config = yaml.safe_load(f)
-        logging.info(f"Loaded config from {CONFIG_FILE}")
-        return config
-    logging.info("Config file not found")
+            profile = yaml.safe_load(f)
+        logging.info(f"Loaded profile from {CONFIG_FILE}")
+        return profile or {}
+    logging.info("Profile file not found")
     return {}
 
-def save_config(config):
+
+def save_profile(profile):
     with open(CONFIG_FILE, 'w') as f:
-        yaml.dump(config, f)
-    logging.info(f"Saved config to {CONFIG_FILE}")
+        yaml.dump(profile, f)
+    logging.info(f"Saved profile to {CONFIG_FILE}")
+
+
+def set_env_value(key, value):
+    """Set a key in .env, preserving comments and existing entries."""
+    lines = ENV_FILE.read_text().splitlines() if ENV_FILE.exists() else []
+    for i, line in enumerate(lines):
+        if line.strip().startswith(f'{key}='):
+            lines[i] = f'{key}={value}'
+            ENV_FILE.write_text('\n'.join(lines) + '\n')
+            return
+    if lines and lines[-1] != '':
+        lines.append('')
+    lines.append(f'{key}={value}')
+    ENV_FILE.write_text('\n'.join(lines) + '\n')
+    os.environ[key] = value
 
 @click.group()
 def cli():
     pass
 
 @cli.command()
-@click.option('--model', help='Ollama model to use')
-@click.option('--templates-dir', help='Directory for LaTeX templates')
-@click.option('--output-dir', help='Directory for generated files')
+@click.option('--model', help='Model name served by llama.cpp (LLM_MODEL)')
+@click.option('--base-url', help='llama.cpp server URL (LLM_BASE_URL)')
+@click.option('--templates-dir', help='Directory for LaTeX templates (TEMPLATES_DIR)')
+@click.option('--output-dir', help='Directory for generated files (OUTPUT_DIR)')
 @click.option('--name', help='Your full name')
 @click.option('--email', help='Your email address')
 @click.option('--phone', help='Your phone number')
@@ -66,38 +102,41 @@ def cli():
 @click.option('--skills', help='Your skills (comma-separated)')
 @click.option('--experience-summary', help='Your experience summary')
 @click.option('--education', help='Your education')
-def configure(model, templates_dir, output_dir, name, email, phone, address, skills, experience_summary, education):
-    """Configure the curriculum generator"""
-    config = load_config()
-    if 'user' not in config:
-        config['user'] = {}
+def configure(model, base_url, templates_dir, output_dir, name, email, phone, address, skills, experience_summary, education):
+    """Configure the curriculum generator (.env for server settings, YAML for profile)"""
     if model:
-        config['model'] = model
+        set_env_value('LLM_MODEL', model)
+    if base_url:
+        set_env_value('LLM_BASE_URL', base_url)
     if templates_dir:
-        config['templates_dir'] = templates_dir
+        set_env_value('TEMPLATES_DIR', templates_dir)
     if output_dir:
-        config['output_dir'] = output_dir
+        set_env_value('OUTPUT_DIR', output_dir)
+
+    profile = load_profile()
     if name:
-        config['user']['name'] = name
+        profile['name'] = name
     if email:
-        config['user']['email'] = email
+        profile['email'] = email
     if phone:
-        config['user']['phone'] = phone
+        profile['phone'] = phone
     if address:
-        config['user']['address'] = address
+        profile['address'] = address
     if skills:
-        config['user']['skills'] = [s.strip() for s in skills.split(',')]
+        profile['skills'] = [s.strip() for s in skills.split(',')]
     if experience_summary:
-        config['user']['experience_summary'] = experience_summary
+        profile['experience_summary'] = experience_summary
     if education:
-        config['user']['education'] = education
-    save_config(config)
+        profile['education'] = education
+    if profile:
+        save_profile(profile)
     click.echo("Configuration saved.")
+
 
 @cli.command()
 def models():
-    """List available Ollama models"""
-    if not check_ollama():
+    """List models served by llama.cpp"""
+    if not check_llama():
         return
     available_models = list_models()
     if available_models:
@@ -114,7 +153,8 @@ def models():
 @click.option('--skill-modification-level', type=float, default=0.5, help='Level of skill modification based on job description (0.0 to 1.0)')
 def generate(job_description, output, dry_run, skill_modification_level):
     """Generate CV and cover letter from job description"""
-    config = load_config()
+    config = get_config()
+    profile = load_profile()
     job_text = job_description.read()
     logging.info(f"Generating documents for job: {job_description.name}")
     logging.debug(f"Job text: {job_text[:500]}...")  # Log first 500 chars
@@ -125,14 +165,14 @@ def generate(job_description, output, dry_run, skill_modification_level):
     else:
         # Generate CV
         click.echo("Generating CV...")
-        cv_content = generate_cv(job_text, config, skill_modification_level)
+        cv_content = generate_cv(job_text, config, profile, skill_modification_level)
         if cv_content is None:
             return
         click.echo("CV generated.")
 
         # Generate cover letter
         click.echo("Generating cover letter...")
-        cover_content = generate_cover_letter(job_text, config, skill_modification_level)
+        cover_content = generate_cover_letter(job_text, config, profile, skill_modification_level)
         if cover_content is None:
             return
         click.echo("Cover letter generated.")
@@ -144,31 +184,67 @@ def generate(job_description, output, dry_run, skill_modification_level):
     # Render HTML and generate PDFs
     click.echo("Rendering HTML and generating PDFs...")
     logging.info("Rendering HTML templates and generating PDFs")
-    render_html(cv_content, cover_content, job_data, output or 'generated', config)
+    render_html(cv_content, cover_content, job_data, output or 'generated', config, profile)
 
     click.echo(f"Generated CV and cover letter in {config['output_dir']}/cv and {config['output_dir']}/cover_letter")
     logging.info(f"Generation completed. Output in {config['output_dir']}")
 
-def check_ollama():
-    """Check if Ollama is running and accessible"""
+
+def llama_headers():
+    """Headers for llama.cpp requests, including auth when an API key is set."""
+    headers = {'Content-Type': 'application/json'}
+    api_key = os.environ.get('LLM_API_KEY', '')
+    if api_key:
+        headers['Authorization'] = f'Bearer {api_key}'
+    return headers
+
+
+def check_llama():
+    """Check if the llama.cpp server is running and accessible"""
+    config = get_config()
+    if not config['model']:
+        click.echo("No model configured. Set LLM_MODEL in .env or run: curriculum configure --model <name>")
+        return False
     try:
-        print("Calling ollama.list()")
-        ollama.list()
-        print("ollama.list() done")
+        requests.get(f"{config['base_url']}/v1/models", headers=llama_headers(), timeout=10)
         return True
     except Exception as e:
-        click.echo(f"Error connecting to Ollama: {e}")
-        click.echo("Make sure Ollama is installed and running.")
+        click.echo(f"Error connecting to llama.cpp at {config['base_url']}: {e}")
+        click.echo("Make sure the llama.cpp server is running (e.g. llama-server -m model.gguf).")
         return False
 
+
 def list_models():
-    """List available Ollama models"""
+    """List models served by llama.cpp"""
+    config = get_config()
     try:
-        models = ollama.list()
-        return [model.model for model in models['models']]
+        resp = requests.get(f"{config['base_url']}/v1/models", headers=llama_headers(), timeout=10)
+        resp.raise_for_status()
+        return [m['id'] for m in resp.json().get('data', [])]
     except Exception as e:
         click.echo(f"Error listing models: {e}")
         return []
+
+
+def llama_chat(prompt, config):
+    """Send a prompt to the llama.cpp server via the OpenAI-compatible chat API."""
+    payload = {
+        'model': config['model'],
+        'messages': [{'role': 'user', 'content': prompt}],
+        'max_tokens': config['max_tokens'],
+        'temperature': 0.2,
+    }
+    if not config['enable_thinking']:
+        # Qwen3-style thinking models burn the token budget on hidden reasoning
+        payload['chat_template_kwargs'] = {'enable_thinking': False}
+    resp = requests.post(
+        f"{config['base_url']}/v1/chat/completions",
+        headers=llama_headers(),
+        json=payload,
+        timeout=config['timeout'],
+    )
+    resp.raise_for_status()
+    return resp.json()['choices'][0]['message']['content']
 
 def format_education(text):
     lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -284,13 +360,13 @@ def format_skills(text):
     '''.strip()
     return Markup(skills_html)
 
-def generate_cv(job_text, config, skill_modification_level):
-    """Generate CV content using Ollama"""
+def generate_cv(job_text, config, profile, skill_modification_level):
+    """Generate CV content using llama.cpp"""
     logging.info("Starting CV generation")
-    if not check_ollama():
-        logging.error("Ollama not available")
+    if not check_llama():
+        logging.error("llama.cpp server not available")
         return None
-    user = config['user']
+    user = profile
     experiences_text = '\n'.join([f"- {exp['title']} at {exp['company']} ({exp['dates']}): {exp['description']}" for exp in user.get('experiences', [])])
     projects_text = '\n'.join([f"- {proj['name']} ({proj['year']}): {proj['description']}" for proj in user.get('projects', [])])
 
@@ -329,9 +405,9 @@ def generate_cv(job_text, config, skill_modification_level):
     logging.debug(f"CV prompt: {prompt[:1000]}...")  # Log first 1000 chars of prompt
     response = None
     try:
-        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 120})
-        logging.debug(f"AI response: {response['response']}")
-        response_text = response['response'].strip()
+        response = llama_chat(prompt, config)
+        logging.debug(f"AI response: {response}")
+        response_text = response.strip()
         if response_text.startswith('```json'):
             response_text = response_text[7:]
         if response_text.endswith('```'):
@@ -375,20 +451,20 @@ def generate_cv(job_text, config, skill_modification_level):
     except Exception as e:
         logging.error(f"Error generating CV: {e}")
         if response:
-            logging.error(f"Response: {response['response']}")
+            logging.error(f"Response: {response}")
         click.echo(f"Error generating CV: {e}")
         return None
 
-def generate_cover_letter(job_text, config, skill_modification_level):
-    """Generate cover letter using Ollama"""
+def generate_cover_letter(job_text, config, profile, skill_modification_level):
+    """Generate cover letter using llama.cpp"""
     logging.info("Starting cover letter generation")
-    if not check_ollama():
-        logging.error("Ollama not available")
+    if not check_llama():
+        logging.error("llama.cpp server not available")
         return None
 
     # Parse job data for better personalization
     job_data = parse_job_description(job_text)
-    user = config['user']
+    user = profile
 
     experiences_text = '\n'.join([f"- {exp['title']} at {exp['company']} ({exp['dates']}): {exp['description']}" for exp in user.get('experiences', [])])
 
@@ -427,9 +503,9 @@ def generate_cover_letter(job_text, config, skill_modification_level):
     logging.debug(f"Cover letter prompt: {prompt[:1000]}...")  # Log first 1000 chars of prompt
     response = None
     try:
-        response = ollama.generate(model=config['model'], prompt=prompt, options={'timeout': 120})
-        logging.debug(f"AI response: {response['response']}")
-        response_text = response['response'].strip()
+        response = llama_chat(prompt, config)
+        logging.debug(f"AI response: {response}")
+        response_text = response.strip()
         if response_text.startswith('```json'):
             response_text = response_text[7:]
         if response_text.endswith('```'):
@@ -450,7 +526,7 @@ def generate_cover_letter(job_text, config, skill_modification_level):
     except Exception as e:
         logging.error(f"Error generating cover letter: {e}")
         if response:
-            logging.error(f"Response: {response['response']}")
+            logging.error(f"Response: {response}")
         click.echo(f"Error generating cover letter: {e}")
         return None
 
@@ -538,7 +614,7 @@ def parse_job_description(job_text):
 
     return job_data
 
-def render_html(cv_content, cover_content, job_data, output_prefix, config):
+def render_html(cv_content, cover_content, job_data, output_prefix, config, profile):
     """Render HTML templates and generate PDFs using WeasyPrint"""
     logging.debug("Rendering CV and cover letter templates")
     try:
@@ -557,7 +633,7 @@ def render_html(cv_content, cover_content, job_data, output_prefix, config):
         cover_output_dir.mkdir(parents=True, exist_ok=True)
 
         # Render CV
-        cv_html = cv_template.render(content=cv_content, user=config['user'], job=job_data)
+        cv_html = cv_template.render(content=cv_content, user=profile, job=job_data)
         cv_html_file = cv_output_dir / f"{output_prefix}.html"
         with open(cv_html_file, 'w') as f:
             f.write(cv_html)
@@ -574,7 +650,7 @@ def render_html(cv_content, cover_content, job_data, output_prefix, config):
         job_data_with_date['date'] = datetime.datetime.now().strftime('%B %d, %Y')
 
         # Render cover letter
-        cover_html = cover_template.render(content=cover_content, user=config['user'], job=job_data_with_date)
+        cover_html = cover_template.render(content=cover_content, user=profile, job=job_data_with_date)
         cover_html_file = cover_output_dir / f"{output_prefix}.html"
         with open(cover_html_file, 'w') as f:
             f.write(cover_html)

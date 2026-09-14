@@ -1,53 +1,49 @@
-model: dolphin3:8b
-output_dir: output
-templates_dir: templates
-user:
-  address: Zurich, Switzerland
-  education: Bachelor in CS
-  email: name.surname@mail.com
-  experience_summary: '5+ years in
+address: Zurich, Switzerland
+education: Bachelor in CS
+email: name.surname@mail.com
+experience_summary: '5+ years in
 
-    development'
-  experiences:
-  - company: Tech Innovations Inc.
-    dates: Jan 2020 - Present
-    description: Led development of scalable web applications using Django and Flask.
-      Designed and implemented RESTful APIs serving 100k+ users. Mentored junior developers
-      and collaborated with cross-functional teams to deliver projects on time. Optimized
-      database queries resulting in 40% performance improvement.
-    title: Senior Python Developer
-  - company: StartupXYZ
-    dates: Jun 2017 - Dec 2019
-    description: Built responsive web applications with React frontend and Node.js
-      backend. Integrated third-party APIs and implemented user authentication systems.
-      Deployed applications to AWS using Docker containers and CI/CD pipelines.
-    title: Full-Stack Developer
-  - company: WebDev Solutions
-    dates: Aug 2015 - May 2017
-    description: Developed and maintained client websites using HTML, CSS, JavaScript,
-      and PHP. Worked with MySQL databases and implemented basic CRUD operations.
-      Participated in code reviews and learned version control with Git.
-    title: Junior Developer
-  linkedin: https://www.linkedin.com/in/niccolo-zuppichini
-  name: Niccolò Zuppichini
-  phone: '+41 76 275 07 06'
-  website: https://rage997.github.io/
-  projects:
-  - description: Built a full-featured e-commerce platform with Django backend, React
-      frontend, and Stripe payment integration. Features include user authentication,
-      product catalog, shopping cart, and order management. Deployed on AWS with Docker.
-    name: E-commerce Platform
-    year: '2023'
-  - description: Developed a collaborative task management application using Flask
-      and Socket.io for real-time updates. Implemented user roles, project boards,
-      and drag-and-drop functionality. Used PostgreSQL for data storage.
-    name: Task Management App
-    year: '2022'
-  - description: Created a personal finance tracking web app with Python and Flask.
-      Features include expense categorization, budget planning, and data visualization
-      with Chart.js. Integrated with Plaid API for bank account syncing.
-    name: Personal Finance Tracker
-    year: '2021'
-  skills:
-  - Python
-  - JavaScript
+  development'
+experiences:
+- company: Tech Innovations Inc.
+  dates: Jan 2020 - Present
+  description: Led development of scalable web applications using Django and Flask.
+    Designed and implemented RESTful APIs serving 100k+ users. Mentored junior developers
+    and collaborated with cross-functional teams to deliver projects on time. Optimized
+    database queries resulting in 40% performance improvement.
+  title: Senior Python Developer
+- company: StartupXYZ
+  dates: Jun 2017 - Dec 2019
+  description: Built responsive web applications with React frontend and Node.js backend.
+    Integrated third-party APIs and implemented user authentication systems. Deployed
+    applications to AWS using Docker containers and CI/CD pipelines.
+  title: Full-Stack Developer
+- company: WebDev Solutions
+  dates: Aug 2015 - May 2017
+  description: Developed and maintained client websites using HTML, CSS, JavaScript,
+    and PHP. Worked with MySQL databases and implemented basic CRUD operations. Participated
+    in code reviews and learned version control with Git.
+  title: Junior Developer
+linkedin: https://www.linkedin.com/in/niccolo-zuppichini
+name: Niccolò Zuppichini
+phone: +41 76 275 07 06
+website: https://rage997.github.io/
+projects:
+- description: Built a full-featured e-commerce platform with Django backend, React
+    frontend, and Stripe payment integration. Features include user authentication,
+    product catalog, shopping cart, and order management. Deployed on AWS with Docker.
+  name: E-commerce Platform
+  year: '2023'
+- description: Developed a collaborative task management application using Flask and
+    Socket.io for real-time updates. Implemented user roles, project boards, and drag-and-drop
+    functionality. Used PostgreSQL for data storage.
+  name: Task Management App
+  year: '2022'
+- description: Created a personal finance tracking web app with Python and Flask.
+    Features include expense categorization, budget planning, and data visualization
+    with Chart.js. Integrated with Plaid API for bank account syncing.
+  name: Personal Finance Tracker
+  year: '2021'
+skills:
+- Python
+- JavaScript

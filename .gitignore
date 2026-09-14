@@ -2,3 +2,5 @@ output/cover_letter/*
 output/cv/*
 curriculum_generator.log
 __pycache__/
+.venv/
+.env

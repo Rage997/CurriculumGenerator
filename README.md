@@ -1,12 +1,12 @@
 # Curriculum AI Generator
 
-A tool to generate customized CVs and cover letters using Ollama AI models based on job descriptions and user profiles.
+A tool to generate customized CVs and cover letters using a local LLM served by [llama.cpp](https://github.com/ggml-org/llama.cpp) (OpenAI-compatible API) based on job descriptions and user profiles.
 
 ## Installation
 
-1. Install dependencies:
+1. Install [uv](https://docs.astral.sh/uv/), then install dependencies:
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 2. Install LaTeX (for PDF compilation):
@@ -23,45 +23,69 @@ A tool to generate customized CVs and cover letters using Ollama AI models based
    sudo apt-get install texlive-luatex texlive-latex-extra
    ```
 
-3. Install and run Ollama:
+3. Start a llama.cpp server with your model:
    ```bash
-   # Install Ollama from https://ollama.ai
-   ollama serve
+   # Install llama.cpp from https://github.com/ggml-org/llama.cpp
+   llama-server -m /path/to/your/model.gguf --port 8080
    ```
 
-4. Pull a model:
-   ```bash
-   ollama pull gemma3:latest
-   ```
+## Configuration
+
+All server and generation settings live in `.env` (see the checked-in example for the full list):
+
+```bash
+# llama.cpp server (OpenAI-compatible API)
+LLM_BASE_URL=http://localhost:8080
+LLM_MODEL=dolphin3:8b
+# Optional API key, only needed if the server requires auth
+LLM_API_KEY=
+# Generation settings
+LLM_MAX_TOKENS=2048
+# Shared server: requests can queue behind other clients, so keep this generous
+LLM_TIMEOUT=1800
+# Set to true to let thinking models (e.g. Qwen3) reason before answering
+LLM_ENABLE_THINKING=false
+
+# Project settings
+OUTPUT_DIR=output
+TEMPLATES_DIR=templates
+```
+
+The user profile (name, skills, experiences, projects, ...) lives in `candidate_config.yaml`.
 
 ## Usage
 
-### Configure User Profile
+All commands run through uv: `uv run curriculum_generator.py ...`
+
+### Configure user profile and server settings
 ```bash
-python curriculum_generator.py configure \
+uv run curriculum_generator.py configure \
   --name "John Doe" \
   --email "john.doe@example.com" \
   --phone "+123456789" \
   --address "123 Main St, City, Country" \
   --skills "Python,JavaScript,SQL,Django" \
-  --experience "5+ years in web development" \
+  --experience-summary "5+ years in web development" \
   --education "Bachelor in Computer Science" \
-  --model gemma3:latest
+  --model dolphin3:8b \
+  --base-url http://localhost:8080
 ```
+
+Profile fields are written to `candidate_config.yaml`; `--model` and `--base-url` are written to `.env`.
 
 ### List available models
 ```bash
-python curriculum_generator.py models
+uv run curriculum_generator.py models
 ```
 
 ### Generate CV and cover letter
 ```bash
-python curriculum_generator.py generate job_description.txt --output my_application
+uv run curriculum_generator.py generate job_description.txt --output my_application
 ```
 
 For testing without AI generation:
 ```bash
-python curriculum_generator.py generate job_description.txt --output test --dry-run
+uv run curriculum_generator.py generate job_description.txt --output test --dry-run
 ```
 
 This will create `my_application.tex` and `my_application.pdf` in the `output/cv/` and `output/cover_letter/` directories.
@@ -72,6 +96,8 @@ This will create `my_application.tex` and `my_application.pdf` in the `output/cv
 - `templates/cover_letter/` - Cover letter LaTeX templates
 - `output/cv/` - Generated CV files
 - `output/cover_letter/` - Generated cover letter files
+- `.env` - Server and generation settings
+- `candidate_config.yaml` - User profile
 
 
 
