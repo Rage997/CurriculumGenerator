@@ -1,9 +1,7 @@
-address: Zurich, Switzerland
-education: Bachelor in CS
-email: name.surname@mail.com
-experience_summary: '5+ years in
-
-  development'
+address: 123 Main St, Springfield
+education: Bachelor in Informatics, Master in Computational Science
+email: john.doe@example.com
+experience_summary: 5 years in realtime rendering
 experiences:
 - company: Tech Innovations Inc.
   dates: Jan 2020 - Present
@@ -24,10 +22,10 @@ experiences:
     and PHP. Worked with MySQL databases and implemented basic CRUD operations. Participated
     in code reviews and learned version control with Git.
   title: Junior Developer
-linkedin: https://www.linkedin.com/in/niccolo-zuppichini
-name: Niccolò Zuppichini
-phone: +41 76 275 07 06
-website: https://rage997.github.io/
+linkedin: https://www.linkedin.com/in/john-doe
+name: John Doe
+phone: '+123456789'
+website: https://johndoe.example.com/
 projects:
 - description: Built a full-featured e-commerce platform with Django backend, React
     frontend, and Stripe payment integration. Features include user authentication,
@@ -46,4 +44,7 @@ projects:
   year: '2021'
 skills:
 - Python
+- C++
 - JavaScript
+- SQL
+- Django
